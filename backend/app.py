@@ -24,7 +24,8 @@ from db import query, now
 from routes import journalists, publishers, campaigns, articles, outreach, audit, import_export
 
 DASHBOARD_DIR = (Path(__file__).parent / ".." / "dashboard").resolve()
-PUBLIC_DASHBOARD_FILES = {"index.html", "api.js", "forms.js"}
+EXAMPLES_DIR = (Path(__file__).parent / ".." / "examples").resolve()
+PUBLIC_DASHBOARD_FILES = {"index.html", "api.js", "forms.js", "csv-import.js"}
 
 logger = logging.getLogger("outreach")
 
@@ -79,6 +80,11 @@ def dashboard_static(filename):
     if not full.is_file():
         return jsonify({"error": "not_found"}), 404
     return send_from_directory(DASHBOARD_DIR, filename)
+
+
+@app.route("/examples/journalists-demo.csv")
+def example_csv():
+    return send_from_directory(EXAMPLES_DIR, "journalists-demo.csv")
 
 app.register_blueprint(journalists.bp, url_prefix="/api")
 app.register_blueprint(publishers.bp, url_prefix="/api")

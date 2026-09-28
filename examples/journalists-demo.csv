@@ -1,0 +1,13 @@
+email,first_name,last_name,job_title,publisher,domain,dr,publisher_scope,market,email_type,email_status,response_status,linkedin,author_page,last_contacted,notes,priority,reports_count,contact_count,main_topic
+elena.vale@cronacaverde.example,Elena,Vale,Energy journalist,Cronaca Verde,cronacaverde.example,76,national,IT,personal,Able to Send,Answered,,,2026-08-12,Synthetic demo contact,high,1,2,Energy
+marco.lido@cronacaverde.example,Marco,Lido,Reporter,Cronaca Verde,cronacaverde.example,76,national,IT,personal,Able to Send,Not answered,,,,Synthetic demo contact,medium,0,0,Climate
+sofia.neri@quadernoenergia.example,Sofia,Neri,Editor,Quaderno Energia,quadernoenergia.example,48,national,IT,personal,Able to Send,Report Sent,,,2026-07-18,Synthetic demo contact,high,2,3,Energy
+lucia.prati@quadernoenergia.example,Lucia,Prati,Reporter,Quaderno Energia,quadernoenergia.example,48,national,IT,personal,Bounced,,,,,Synthetic demo contact,low,0,0,
+ana.rio@diariosolar.example,Ana,Río,Energy correspondent,Diario Solar,diariosolar.example,82,national,ES,personal,Able to Send,Converted,,,2026-06-04,Synthetic demo contact,high,1,4,Solar
+diego.paz@diariosolar.example,Diego,Paz,Reporter,Diario Solar,diariosolar.example,82,national,ES,personal,Able to Send,Not answered,,,,Synthetic demo contact,medium,0,0,Energy
+ines.lago@cuadernoverde.example,Inés,Lago,Editor,Cuaderno Verde,cuadernoverde.example,53,national,ES,personal,Able to Send,Answered,,,2026-09-01,Synthetic demo contact,medium,0,1,Climate
+leo.marte@cuadernoverde.example,Leo,Marte,Reporter,Cuaderno Verde,cuadernoverde.example,53,national,ES,personal,Not Email,,,,,Synthetic demo contact,low,0,0,Environment
+camille.rose@lettreenergie.example,Camille,Rose,Energy journalist,Lettre Énergie,lettreenergie.example,71,national,FR,personal,Able to Send,Answered,,,2026-07-03,Synthetic demo contact,high,1,2,Energy
+noe.durant@lettreenergie.example,Noé,Durant,Reporter,Lettre Énergie,lettreenergie.example,71,national,FR,personal,Able to Send,Not answered,,,,Synthetic demo contact,medium,0,0,Climate
+lea.fontaine@observatoirevert.example,Léa,Fontaine,Editor,Observatoire Vert,observatoirevert.example,36,national,FR,personal,Able to Send,Old Contact,,,2025-12-04,Synthetic demo contact,medium,0,1,Environment
+remi.clair@observatoirevert.example,Rémi,Clair,Reporter,Observatoire Vert,observatoirevert.example,36,national,FR,personal,,,,,,Synthetic demo contact,low,0,0,Energy

@@ -6,6 +6,7 @@
     <title>Outreach Archive</title>
     <script src="api.js"></script>
     <script src="forms.js"></script>
+    <script src="csv-import.js" defer></script>
     <script>window.PLANNER_RESULTS=null;window.OUTREACH_HISTORY=[];window.GRAPH_DATA=null;</script>
     <style>
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -215,6 +216,13 @@
         .page-header{padding:28px 0 0}
         .page-header h2{font-size:24px;font-weight:800;color:var(--navy);letter-spacing:-0.02em}
         .page-header p{font-size:14px;color:var(--text-muted);margin-top:4px}
+        .csv-import{margin:22px 0;padding:20px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius)}
+        .csv-import h3{font-size:16px;color:var(--navy)}
+        .csv-import p{font-size:13px;color:var(--text-muted);margin:4px 0 12px}
+        .csv-import input{max-width:100%;margin-right:12px}
+        .csv-import button{padding:8px 14px;border:0;border-radius:8px;background:var(--primary);color:white;cursor:pointer}
+        .csv-import button:disabled{opacity:0.5;cursor:not-allowed}
+        .csv-import output{display:block;white-space:pre-wrap;font-size:13px;margin-top:12px}
 
         /* Market tabs */
         .market-tabs{
@@ -903,6 +911,12 @@
 
     <div class="kpi-strip" id="kpi-strip"></div>
 
+    <section class="market-section" aria-label="Data completeness">
+        <div class="section-label">Qualità dei dati</div>
+        <h2 class="section-title">Completezza dei contatti</h2>
+        <p id="data-completeness"></p>
+    </section>
+
     <section class="market-section">
         <div class="section-label">Markets</div>
         <h2 class="section-title">Breakdown per Mercato</h2>
@@ -942,6 +956,15 @@
             <h2>Database Giornalisti</h2>
             <p>Browse, search and review the records in this local database.</p>
         </div>
+
+        <section class="csv-import" aria-label="Import CSV">
+            <h3>Importa il tuo CSV (admin)</h3>
+            <p>Scarica il <a href="/examples/journalists-demo.csv" download>CSV di esempio</a>, usa le stesse colonne e verifica l'anteprima prima di importare. Il file rimane nel database locale.</p>
+            <input type="file" id="csv-file" accept=".csv,text/csv" aria-label="Seleziona CSV giornalisti">
+            <button type="button" id="csv-preview">Controlla CSV</button>
+            <button type="button" id="csv-apply" disabled>Conferma import</button>
+            <output id="csv-result" aria-live="polite"></output>
+        </section>
 
         <div class="market-tabs" id="market-tabs"></div>
 
@@ -1459,6 +1482,8 @@ function __ppnStartDashboard() {
     function renderHome() {
         // Last updated
         $("#last-updated").textContent = `Ultimo aggiornamento: ${meta.generated}`;
+        const complete = journalists.filter(j => j.first_name && j.last_name && j.publisher && j.topics.length && j.email_status).length;
+        $("#data-completeness").textContent = `${complete} / ${journalists.length} contatti con nome, cognome, testata, topic e stato email. I campi assenti restano visibili nel Database; questa misura descrive i dati inseriti, non verifica i contatti.`;
 
         // KPIs
         $("#kpi-strip").innerHTML = `

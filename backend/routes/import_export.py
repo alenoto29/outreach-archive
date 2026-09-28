@@ -3,15 +3,21 @@ import hashlib
 import io
 import json
 import re
-import sqlite3
 from flask import Blueprint, request, jsonify, Response
-from db import query, execute, now
+from db import query, execute, now, transaction
 from auth import require_auth, require_admin, get_user, get_role
 
 bp = Blueprint("import_export", __name__)
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+$")
 VALID_MARKETS = {"IT", "ES", "FR", "UK", "PT"}
+IMPORT_FIELDS = {"email", "market", "first_name", "last_name", "job_title", "publisher",
+                 "domain", "dr", "publisher_scope", "email_type", "email_status",
+                 "response_status", "linkedin", "author_page", "last_contacted",
+                 "notes", "priority", "reports_count", "contact_count", "main_topic"}
+JOURNALIST_FIELDS = ("first_name", "last_name", "job_title", "email_type", "email_status",
+                     "response_status", "linkedin", "author_page", "last_contacted",
+                     "notes", "priority", "main_topic", "reports_count", "contact_count")
 
 
 def _spreadsheet_safe(value):
@@ -212,100 +218,103 @@ def import_csv():
         content = stream.decode("latin-1")
 
     reader = csv.DictReader(io.StringIO(content))
-    rows = list(reader)
-
+    if not reader.fieldnames:
+        return jsonify({"error": "validation", "message": "CSV header required"}), 400
+    fields = [name.strip().lower() for name in reader.fieldnames]
+    if len(fields) != len(set(fields)) or not {"email", "market"}.issubset(fields):
+        return jsonify({"error": "validation", "message": "unique email and market columns required"}), 400
+    unknown = set(fields) - IMPORT_FIELDS
+    if unknown:
+        return jsonify({"error": "validation", "message": f"unsupported columns: {', '.join(sorted(unknown))}"}), 400
+    reader.fieldnames = fields
     results = {"created": 0, "updated": 0, "skipped": 0, "errors": []}
+    seen = set()
 
-    for i, row in enumerate(rows):
-        email = (row.get("email") or row.get("Email") or "").strip()
-        if not email or not EMAIL_RE.match(email):
-            results["errors"].append({"row": i + 2, "msg": f"invalid email: {email!r}"})
-            continue
-
-        market = (row.get("market") or row.get("Market") or "").strip().upper()
-        if market not in VALID_MARKETS:
-            results["errors"].append({"row": i + 2, "msg": f"invalid market: {market!r}"})
-            continue
-
-        if dry_run:
-            results["created"] += 1
-            continue
-
-        existing = query("SELECT id FROM journalists WHERE email=?", (email,), one=True)
-        ts = now()
-
-        pub_name = (row.get("publisher") or row.get("Publisher") or "").strip()
-        pub_domain = (row.get("domain") or row.get("Domain") or "").strip()
-        publisher_id = None
-        if pub_name or pub_domain:
-            name = pub_name or pub_domain
-            p = query("SELECT id FROM publishers WHERE lower(name)=lower(?) AND market=?", (name, market), one=True)
-            if p:
-                publisher_id = p["id"]
-            else:
-                try:
-                    pid, _ = execute(
-                        "INSERT INTO publishers (name, domain, market, created_at, updated_at, updated_by) VALUES (?,?,?,?,?,?)",
-                        (name, pub_domain or None, market, ts, ts, user)
-                    )
-                    publisher_id = pid
-                    execute(
-                        "INSERT INTO audit_log (entity_type, entity_id, action, user, role) VALUES ('publisher',?,'create',?,?)",
-                        (pid, user, role)
-                    )
-                except sqlite3.IntegrityError:
-                    p = query("SELECT id FROM publishers WHERE lower(name)=lower(?) AND market=?", (name, market), one=True)
-                    publisher_id = p["id"] if p else None
-
-        try:
-            if existing:
-                execute(
-                    """UPDATE journalists SET first_name=?, last_name=?, publisher_id=?,
-                       email_status=?, response_status=?, updated_at=?, updated_by=? WHERE email=?""",
-                    (
-                        (row.get("first_name") or "").strip() or None,
-                        (row.get("last_name") or "").strip() or None,
-                        publisher_id,
-                        (row.get("email_status") or "").strip() or None,
-                        (row.get("response_status") or "").strip() or None,
-                        ts, user, email,
-                    )
-                )
-                execute(
-                    "INSERT INTO audit_log (entity_type, entity_id, action, user, role) VALUES ('journalist',?,'update',?,?)",
-                    (existing["id"], user, role)
-                )
-                results["updated"] += 1
-            else:
-                jid, _ = execute(
-                    """INSERT INTO journalists
-                       (email, first_name, last_name, publisher_id, market,
-                        email_status, response_status, created_at, updated_at, updated_by)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    (
-                        email,
-                        (row.get("first_name") or "").strip() or None,
-                        (row.get("last_name") or "").strip() or None,
-                        publisher_id, market,
-                        (row.get("email_status") or "").strip() or None,
-                        (row.get("response_status") or "").strip() or None,
-                        ts, ts, user,
-                    )
-                )
-                execute(
-                    "INSERT INTO audit_log (entity_type, entity_id, action, user, role) VALUES ('journalist',?,'create',?,?)",
-                    (jid, user, role)
-                )
-                results["created"] += 1
-        except sqlite3.IntegrityError as e:
-            msg = str(e)
-            if "UNIQUE" in msg:
+    with transaction() as conn:
+        for i, raw in enumerate(reader, start=2):
+            if None in raw:
+                results["errors"].append({"row": i, "msg": "too many columns"})
+                continue
+            row = {key: (value or "").strip() for key, value in raw.items()}
+            email = row["email"].lower()
+            market = row["market"].upper()
+            if not EMAIL_RE.match(email):
+                results["errors"].append({"row": i, "msg": "invalid email"})
+                continue
+            if market not in VALID_MARKETS:
+                results["errors"].append({"row": i, "msg": "invalid market"})
+                continue
+            if email in seen:
                 results["skipped"] += 1
-                results["errors"].append({"row": i + 2, "msg": "duplicate (case variant or race)"})
-            elif "CHECK" in msg:
-                results["errors"].append({"row": i + 2, "msg": "constraint failed"})
+                results["errors"].append({"row": i, "msg": "duplicate email in file"})
+                continue
+            seen.add(email)
+            try:
+                dr = int(row["dr"]) if row.get("dr") else None
+                counts = {k: int(row[k]) for k in ("contact_count", "reports_count") if row.get(k)}
+                if (dr is not None and not 0 <= dr <= 100) or any(n < 0 for n in counts.values()):
+                    raise ValueError
+            except ValueError:
+                results["errors"].append({"row": i, "msg": "dr must be 0-100; counts must be non-negative integers"})
+                continue
+
+            existing = query("SELECT id, market FROM journalists WHERE lower(email)=?", (email,), one=True, conn=conn)
+            if existing and existing["market"] != market:
+                results["errors"].append({"row": i, "msg": "existing email belongs to another market"})
+                continue
+            results["updated" if existing else "created"] += 1
+            if dry_run:
+                continue
+
+            ts = now()
+            pub_name = row.get("publisher") or row.get("domain")
+            pub_id = None
+            if pub_name:
+                p = query("SELECT id FROM publishers WHERE lower(name)=lower(?) AND market=?",
+                          (pub_name, market), one=True, conn=conn)
+                if p:
+                    pub_id = p["id"]
+                else:
+                    pub_id, _ = execute(
+                        "INSERT INTO publishers (name, market, domain, dr, publisher_scope, updated_by) VALUES (?,?,?,?,?,?)",
+                        (pub_name, market, row.get("domain") or None, dr,
+                         row.get("publisher_scope") or None, user), conn=conn)
+                    execute("INSERT INTO audit_log (entity_type, entity_id, action, user, role) VALUES ('publisher',?,'create',?,?)",
+                            (pub_id, user, role), conn=conn)
+                pub_values = {k: row[k] for k in ("domain", "publisher_scope") if row.get(k)}
+                if dr is not None:
+                    pub_values["dr"] = dr
+                if pub_values:
+                    assignments = ", ".join(f"{key}=?" for key in pub_values)
+                    execute(f"UPDATE publishers SET {assignments}, updated_at=? WHERE id=?",
+                            (*pub_values.values(), ts, pub_id), conn=conn)
+
+            values = {key: counts.get(key, row[key]) for key in JOURNALIST_FIELDS if row.get(key)}
+            if pub_id is not None:
+                values["publisher_id"] = pub_id
+            if existing:
+                jid = existing["id"]
+                if values:
+                    assignments = ", ".join(f"{key}=?" for key in values)
+                    execute(f"UPDATE journalists SET {assignments}, updated_at=?, updated_by=? WHERE id=?",
+                            (*values.values(), ts, user, jid), conn=conn)
+                action = "update"
             else:
-                raise
+                columns = ("email", "market", *values.keys(), "updated_by")
+                placeholders = ", ".join("?" for _ in columns)
+                jid, _ = execute(f"INSERT INTO journalists ({', '.join(columns)}) VALUES ({placeholders})",
+                                 (email, market, *values.values(), user), conn=conn)
+                action = "create"
+            if row.get("main_topic"):
+                topic_id = query("SELECT id FROM topics WHERE name=?", (row["main_topic"],), one=True, conn=conn)
+                if not topic_id:
+                    tid, _ = execute("INSERT INTO topics (name) VALUES (?)", (row["main_topic"],), conn=conn)
+                else:
+                    tid = topic_id["id"]
+                execute("INSERT OR IGNORE INTO journalist_topics (journalist_id, topic_id, source) VALUES (?,?,'csv')",
+                        (jid, tid), conn=conn)
+            execute("INSERT INTO audit_log (entity_type, entity_id, action, user, role) VALUES ('journalist',?,?,?,?)",
+                    (jid, action, user, role), conn=conn)
 
     if dry_run:
         results["dry_run"] = True
