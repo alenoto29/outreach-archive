@@ -2,6 +2,8 @@
 
 A local, multi-user contact archive with a Flask API, SQLite storage and a browser dashboard. A wholly fictional CSV lets you explore the archive before importing your own contacts. It does not discover contacts, send email or connect to any hosted service by default.
 
+[View the project site](https://alenoto29.github.io/outreach-archive/). The site is a static overview; the working dashboard runs locally with the Flask API.
+
 ## Local quickstart
 
 Requirements: Python 3.10+.
@@ -22,7 +24,7 @@ export ADMIN_NAMES=demo-admin
 python3 backend/app.py
 ```
 
-Open <http://127.0.0.1:8080> and sign in as `demo-admin` with the first token above. Go to **Database → Importa il tuo CSV**, download the example, select it and click **Controlla CSV → Conferma import**. The dashboard now shows 12 invented journalists across IT/ES/FR, six invented publishers, different contact statuses, topics and missing fields. Explore **Home** (counts and data completeness), **Database** (market/topic/status/DR filters, search, details and edits), **Publishers** (coverage), and **Entità**. The database is empty until you import; the checked-in sample CSV contains no real contact or live domain. Use one token per user. A token is mapped to a username by the server; a browser-supplied name cannot grant a role. With no valid `USER_TOKENS` mapping, all protected API routes fail closed.
+Open `http://127.0.0.1:8080` on the computer running Flask and sign in as `demo-admin` with the first token above. Go to **Database → Importa il tuo CSV**, download the example, select it and click **Controlla CSV → Conferma import**. The dashboard now shows 12 invented journalists across IT/ES/FR, six invented publishers, different contact statuses, topics and missing fields. Explore **Home** (counts and data completeness), **Database** (market/topic/status/DR filters, search, details and edits), **Publishers** (coverage), and **Entità**. The database is empty until you import; the checked-in sample CSV contains no real contact or live domain. Use one token per user. A token is mapped to a username by the server; a browser-supplied name cannot grant a role. With no valid `USER_TOKENS` mapping, all protected API routes fail closed.
 
 For another environment, set `DB_PATH` to a new writable database path and run the initialization command against that empty path. The app binds to loopback by default. Changing the bind host makes the service reachable beyond the local machine and must be an explicit operator decision.
 
